@@ -47,6 +47,8 @@ public class CBPChapterParser {
     public static String TEN_KEY = "TEN_KEY";
     public static String LAST_TWO_KEY = "LAST_TWO_KEY";
 
+    public static Set<String> htsAddedSet = new HashSet<>();
+
     public static void main11(String[] args) {
         String line = "0303.41.00.00 : Fish, frozen, excluding fish fillets and other fish meat of heading 04: : Tunas (of the genus Thunnus), skipjack tuna (stripe-bellied bonito) (Katsuwonus pelamis), excluding edible fish offal of subheadings 0303:91 to 0303:99: Albacore or longfinned tunas (Thunnus alalunga): kg";
         //if (line.matches(ABC)) {
@@ -158,7 +160,7 @@ public class CBPChapterParser {
                 if (line.startsWith(FIRST_FOUR_PREFIX) && line.matches(ALL_TEN_PATTERN)) {
                     htsVal = line.replaceAll(ALL_TEN_PATTERN, "$2").trim();
                     htsVal = htsVal.replaceAll("\\s+", ".");
-                    if (htsVal.equals("0306.17.00.29")) {
+                    if (htsVal.equals("0301.91.00.00")) {
                         System.out.println("1");
                     }
                     //pop the stack based on the values in HTS
@@ -180,7 +182,7 @@ public class CBPChapterParser {
                     order = 40;
                     String totalLine = lines[i].substring(line.length());
                     String lastTwoVal = line.replaceAll(LAST_TWO_PATTERN, "$2").trim();
-                    if (eightHTSVal.equals("0306.17.00") && lastTwoVal.equals("29")) {
+                    if (eightHTSVal.equals("0102.39.00") && lastTwoVal.equals("10")) {
                         System.out.println("1");
                     }
                     htsVal = eightHTSVal + "."+ lastTwoVal;
@@ -300,16 +302,20 @@ public class CBPChapterParser {
                                 && Integer.parseInt(parts[2]) <= Integer.parseInt(lastParts[2])
                                 && Integer.parseInt(parts[1]) <= Integer.parseInt(lastParts[1])
                                 && Integer.parseInt(parts[0]) <= Integer.parseInt(lastParts[0])) {
-                            skip = true;
+                                skip = true;
                         }
                     }
                     if (!skip) {
                         value = value.replaceAll("\\(con.\\)", "");
-                        value = value.replaceAll("\\.{3,}", "->").trim();
-                        if (value.endsWith("->")) {
-                            value = value.substring(0, value.length()-2);
+                        if (!htsAddedSet.contains(htsVal) || (value.length() > 8 && value.substring(value.length()-8).contains("..."))) {
+                            value = value.replaceAll("\\.{3,}", "->").trim();
+                            if (value.endsWith("->")) {
+                                value = value.substring(0, value.length()-2);
+                            }
+                            value = value.replaceAll("->\\s+->", "->");
+                            finalHTSMap.put(htsVal, value);
+                            htsAddedSet.add(htsVal);
                         }
-                        finalHTSMap.put(htsVal, value);
                         lastHTS = htsVal;
                     }
                     String[] tempVals = value.split(":");
@@ -477,12 +483,16 @@ public class CBPChapterParser {
                         }
                         if (!skip) {
                             value = value.replaceAll("\\(con.\\)", "");
-                            value = value.replaceAll("\\.{3,}", "->").trim();
                             value = value.replaceAll(":", "->").trim();
-                            if (value.endsWith("->")) {
-                                value = value.substring(0, value.length()-2);
+                            if (!htsAddedSet.contains(htsVal) || (value.length() > 8 && value.substring(value.length()-8).contains("..."))) {
+                                value = value.replaceAll("\\.{3,}", "->").trim();
+                                if (value.endsWith("->")) {
+                                    value = value.substring(0, value.length()-2);
+                                }
+                                value = value.replaceAll("->\\s+->", "->");
+                                finalHTSMap.put(htsVal, value);
+                                htsAddedSet.add(htsVal);
                             }
-                            finalHTSMap.put(htsVal, value);
                             lastHTS = htsVal;
                         }
                     }
