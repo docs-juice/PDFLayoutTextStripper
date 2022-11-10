@@ -1,12 +1,12 @@
+package io.github.jonathanlink;
+
 import io.github.jonathanlink.PDFLayoutTextStripper;
 import org.apache.pdfbox.io.RandomAccessFile;
 import org.apache.pdfbox.pdfparser.PDFParser;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,23 +47,60 @@ public class CBPChapterParser {
     public static String TEN_KEY = "TEN_KEY";
     public static String LAST_TWO_KEY = "LAST_TWO_KEY";
 
-    public static void main2(String[] args) {
-        String line = " ";
-        if (line.matches(ABC)) {
-            System.out.println("true");
+    public static void main11(String[] args) {
+        String line = "0303.41.00.00 : Fish, frozen, excluding fish fillets and other fish meat of heading 04: : Tunas (of the genus Thunnus), skipjack tuna (stripe-bellied bonito) (Katsuwonus pelamis), excluding edible fish offal of subheadings 0303:91 to 0303:99: Albacore or longfinned tunas (Thunnus alalunga): kg";
+        //if (line.matches(ABC)) {
+        if (line.contains(": : ")) {
+            System.out.println(line);
+            line = line.replaceAll(": : ", ": ");
+            line = line.replaceAll(": ", "->");
+            System.out.println(line);
         }
     }
 
+    /*public static void main(String[] args) {
+        try {
+            File folder = new File("/Users/ashishmehrotra/Downloads/cbp chapters/");
+            for (final File fileEntry : folder.listFiles()) {
+                System.out.println("File processing... " + fileEntry.getAbsolutePath());
+                if (!fileEntry.isDirectory() && fileEntry.getName().endsWith("pdf")) {
+                    String txtFileName = fileEntry.getAbsolutePath().replace(".pdf", ".sql");
+                    boolean fileExists = new File(txtFileName).exists();
+                    if (fileEntry.getName().endsWith("99.pdf") || fileExists)
+                        continue;
+                    String value = processFile(fileEntry.getAbsolutePath());
+
+                    BufferedWriter writer = new BufferedWriter(new FileWriter(txtFileName));
+                    writer.write(value);
+                    writer.close();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }*/
+
     public static void main(String[] args) {
+        try {
+
+            String value = processFile("/Users/ashishmehrotra/Downloads/cbp chapters/Chapter 3.pdf");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static String processFile(String fileName) {
         String string = null;
         try {
-            PDFParser pdfParser = new PDFParser(new RandomAccessFile(new File("/Users/ashishmehrotra/Downloads/cbp chapters/Chapter 94.pdf"), "r"));
+            PDFParser pdfParser = new PDFParser(new RandomAccessFile(new File(fileName), "r"));
             pdfParser.parse();
             PDDocument pdDocument = new PDDocument(pdfParser.getDocument());
             PDFTextStripper pdfTextStripper = new PDFLayoutTextStripper();
             string = pdfTextStripper.getText(pdDocument);
             String[] lines = string.split("\n");
             int i=0;
+            String lastHTS = null;
 
             for (String line: lines) {
                 if (line.startsWith(FIRST_FOUR_PREFIX) && line.matches(FIRST_FOUR_PATTERN)) {
@@ -82,6 +119,7 @@ public class CBPChapterParser {
             int contentOffset = 0, prevContentOffset = -1;
             Stack<Integer> contentOffsets = new Stack<>();
             Stack<String> contentValues = new Stack<>();
+            Stack<String> contentKeyTypes = new Stack<>();
 
             String val = null;
             String htsVal = null;
@@ -104,6 +142,7 @@ public class CBPChapterParser {
                 if (line.trim().startsWith("Harmonized")) {
                     contentValues.clear();
                     contentOffsets.clear();
+                    contentKeyTypes.clear();
                     while (!(line.startsWith(FIRST_FOUR_PREFIX) && line.matches(FIRST_FOUR_PATTERN))) {
                         if (i == lines.length - 1)
                             break;
@@ -113,15 +152,20 @@ public class CBPChapterParser {
                 if (i == lines.length - 1)
                     break;
 
-
+                if (line.trim().length() == 0 || line.trim().equals("(con.)")) { //nothing to add in the line, keep moving
+                    continue;
+                }
                 if (line.startsWith(FIRST_FOUR_PREFIX) && line.matches(ALL_TEN_PATTERN)) {
                     htsVal = line.replaceAll(ALL_TEN_PATTERN, "$2").trim();
                     htsVal = htsVal.replaceAll("\\s+", ".");
+                    if (htsVal.equals("0306.17.00.29")) {
+                        System.out.println("1");
+                    }
                     //pop the stack based on the values in HTS
 
                     val = line.replaceAll(ALL_TEN_PATTERN, "$3").trim();
                     contentOffset = line.indexOf(val);
-                    val = val.replaceAll("\\(con.\\)", "");
+                    //val = val.replaceAll("\\(con.\\)", "");
                     currType = TEN_KEY;
                     currKey = htsVal;
                 } else if (line.startsWith(FIRST_FOUR_PREFIX) && line.matches(FIRST_EIGHT_PATTERN)) {
@@ -129,23 +173,20 @@ public class CBPChapterParser {
                     eightHTSVal = line.replaceAll(FIRST_EIGHT_PATTERN, "$2").trim();
                     val = line.replaceAll(FIRST_EIGHT_PATTERN, "$3").trim();
                     contentOffset = line.indexOf(val);
-                    val = val.replaceAll("\\(con.\\)", "");
-                    if (eightHTSVal.equals("9401.39.00")) {
-                        System.out.println("found");
-                    }
+                    //val = val.replaceAll("\\(con.\\)", "");
                     currType = EIGHT_KEY;
                     currKey = eightHTSVal;
                 } else if (line.startsWith(LAST_TWO_PREFIX) && line.matches(LAST_TWO_PATTERN)) {//starting of first 4
                     order = 40;
                     String totalLine = lines[i].substring(line.length());
                     String lastTwoVal = line.replaceAll(LAST_TWO_PATTERN, "$2").trim();
+                    if (eightHTSVal.equals("0306.17.00") && lastTwoVal.equals("29")) {
+                        System.out.println("1");
+                    }
                     htsVal = eightHTSVal + "."+ lastTwoVal;
                     val = line.replaceAll(LAST_TWO_PATTERN, "$3").trim();
                     contentOffset = line.indexOf(val);
-                    val = val.replaceAll("\\(con.\\)", "");
-                    if (val.equals("75")) {
-                        System.out.println("75");
-                    }
+                    //val = val.replaceAll("\\(con.\\)", "");
                     currType = LAST_TWO_KEY;
                     currKey = htsVal;
                 } else if (line.startsWith(FIRST_FOUR_PREFIX) && line.matches(FIRST_SIX_PATTERN)) {
@@ -153,12 +194,13 @@ public class CBPChapterParser {
                     firtSixVal = line.replaceAll(FIRST_SIX_PATTERN, "$2").trim();
                     val = line.replaceAll(FIRST_SIX_PATTERN, "$3").trim();
                     contentOffset = line.indexOf(val);
-                    val = val.replaceAll("\\(con.\\)", "");
+                    //val = val.replaceAll("\\(con.\\)", "");
                     currType = SIX_KEY;
                     currKey = firtSixVal;
                 } else if (line.startsWith(FIRST_FOUR_PREFIX) && line.matches(FIRST_FOUR_PATTERN)) {
                     contentValues.clear();
                     contentOffsets.clear();
+                    contentKeyTypes.clear();
                     order = 10;
                     firtFourVal = line.replaceAll(FIRST_FOUR_PATTERN, "$2").trim();
                     val = line.replaceAll(FIRST_FOUR_PATTERN, "$7").trim();
@@ -173,12 +215,13 @@ public class CBPChapterParser {
                     if (val.length() == 0) {
                         continue;
                     }
-                    val = val.replaceAll("\\(con.\\)", "");
+                    //val = val.replaceAll("\\(con.\\)", "");
                     if (contentOffset > prevContentOffset) {
-                        order = prevOrder + 5; //it could be next 4digit or 8 digit
-                    } else if (contentOffset == prevContentOffset) {
+                        order = prevOrder + 2; //it could be next 4digit or 8 digit
+                    } /*else if (contentOffset == prevContentOffset) {
                         currType = prevType;
-                    }
+                    }*/
+                    currType = null;
                 }
                 prevOrder = order;
 
@@ -187,18 +230,37 @@ public class CBPChapterParser {
                 if (contentValues.isEmpty() || contentOffsets.peek() < contentOffset) {
                     contentOffsets.push(contentOffset);
                     contentValues.push(prev + " " + val);
+                    contentKeyTypes.push(currType);
+                    //contentValues.push(val);
                 } else if (contentOffsets.peek() == contentOffset) {
                     //String v = hasHtsInLine? contentValues.peek() : contentValues.pop();
                     prev = contentValues.size() > 0 ? contentValues.peek() : "";
-                    String v = contentValues.pop();
+                    String v = contentValues.peek();
                     //NOTE - use contains and not ends with because units get parsed sometimes too
-                    if (v.endsWith(":") || v.contains("...")) {
-                        contentValues.push(prev + " " + val);
-                        contentOffsets.pop();
-                        contentOffsets.push(contentOffset);
-                    } else {
-                        v += " " + val;
-                        contentValues.push(v);
+                    if (!v.equals("")) {
+                        if (v.endsWith(":") || (v.length() > 8 && v.substring(v.length()-8).contains("..."))) {
+                            if (currType != null && contentOffset != contentOffsets.peek()) {
+                                contentValues.pop();
+                                contentValues.push(prev + " " + val);
+                                contentOffsets.pop();
+                                contentOffsets.push(contentOffset);
+                            } else {
+                                String oldVal = contentValues.pop();
+                                contentOffsets.pop();
+                                prev = contentValues.size() > 0 ? contentValues.peek() : "";
+                                if (prev.length() == 0) {
+                                    prev = oldVal;
+                                }
+                                contentValues.push(prev + " " + val);
+                                contentOffsets.push(contentOffset);
+                            }
+                            contentKeyTypes.pop();
+                            contentKeyTypes.push(currType);
+                        } else {
+                            v += " " + val;
+                            contentValues.pop();
+                            contentValues.push(v);
+                        }
                     }
                     if (currType == null) {
                         currKey = prevKey;
@@ -207,28 +269,49 @@ public class CBPChapterParser {
                     while (!contentOffsets.isEmpty() && contentOffsets.peek() >= contentOffset) {
                         contentOffsets.pop();
                         contentValues.pop();
+                        contentKeyTypes.pop();
                     }
                     contentOffsets.push(contentOffset);
                     prev = contentValues.size() > 0 ? contentValues.peek() + " :" : "";
                     contentValues.push(prev + " " + val);
+                    contentKeyTypes.push(currKey);
                     currKey = null;
                 }
 
                 if (line.matches(ALL_TEN_PATTERN) || (line.startsWith(LAST_TWO_PREFIX) && line.matches(LAST_TWO_PATTERN))) {
                     String value = contentValues.peek();
-                    if (value.endsWith("...") || (value.length() > 10 && value.substring(0, value.length()-6).contains("..."))) {
-                        contentValues.pop();
-                        contentOffsets.pop();
+                    //since the line has ... means it is ending the value and there's no follow up content in next line, so safe to pop it
+                    if (value.endsWith("...") || (value.length() > 8 && value.substring(value.length()-8).contains("..."))) {
+                        while (contentOffsets.size() > 0 && contentOffsets.peek() >= contentOffset) {
+                            contentValues.pop();
+                            contentOffsets.pop();
+                            contentKeyTypes.pop();
+                        }
                     }
-                    value = value.replaceAll("\\.+", ":").trim();
-                    if (value.endsWith(":")) {
-                        value = value.substring(0, value.length() - 1);
+
+                    //System.out.println(htsVal + " : " + value);
+                    value = value.replaceAll(": : ", ": ");
+                    value = value.replaceAll(": ", "->");
+                    boolean skip = false;
+                    if (lastHTS != null && !lastHTS.equals(htsVal)) {
+                        String[] lastParts = lastHTS.split("\\.");
+                        String[] parts = htsVal.split("\\.");
+                        if (Integer.parseInt(parts[3]) <= Integer.parseInt(lastParts[3])
+                                && Integer.parseInt(parts[2]) <= Integer.parseInt(lastParts[2])
+                                && Integer.parseInt(parts[1]) <= Integer.parseInt(lastParts[1])
+                                && Integer.parseInt(parts[0]) <= Integer.parseInt(lastParts[0])) {
+                            skip = true;
+                        }
                     }
-                    if (value.endsWith(": No")) {
-                        value = value.substring(0, value.length() - 4);
+                    if (!skip) {
+                        value = value.replaceAll("\\(con.\\)", "");
+                        value = value.replaceAll("\\.{3,}", "->").trim();
+                        if (value.endsWith("->")) {
+                            value = value.substring(0, value.length()-2);
+                        }
+                        finalHTSMap.put(htsVal, value);
+                        lastHTS = htsVal;
                     }
-                    System.out.println(htsVal + " : " + value);
-                    finalHTSMap.put(htsVal, value);
                     String[] tempVals = value.split(":");
                     List<String> tempList = new ArrayList<>();
 
@@ -244,7 +327,7 @@ public class CBPChapterParser {
                     if (vals.length == 4) {
                         v = vals[0].trim();
                         key = htsVal.substring(0, 4);
-                        if (!fourLetterMaps.containsValue(v)) {
+                        /*if (!fourLetterMaps.containsValue(v)) {
                             fourLetterMaps.put(key, v);
                         }
                         key = htsVal.substring(0, 7);
@@ -262,11 +345,11 @@ public class CBPChapterParser {
                         if (!tenLetterMaps.containsValue(v)) {
                             tenLetterMaps.put(htsVal, v);
                         }
-                        currKey = key;
+                        currKey = key;*/
                     }
                 } else if (line.startsWith(FIRST_FOUR_PREFIX) && line.matches(FIRST_EIGHT_PATTERN)) {
                     String value = contentValues.peek();
-                    value = value.replaceAll("\\.+", ":").trim();
+                    //value = value.replaceAll("\\.+", ":").trim();
                     if (value.endsWith(":")) {
                         value = value.substring(0, value.length() - 1);
                     }
@@ -305,7 +388,7 @@ public class CBPChapterParser {
                     }
                 } else if (line.startsWith(FIRST_FOUR_PREFIX) && line.matches(FIRST_SIX_PATTERN)) {
                     String value = contentValues.peek();
-                    value = value.replaceAll("\\.+", ":").trim();
+                    //value = value.replaceAll("\\.+", ":").trim();
                     if (value.endsWith(":")) {
                         value = value.substring(0, value.length() - 1);
                     }
@@ -339,7 +422,7 @@ public class CBPChapterParser {
                     currKey = key;
                 } else if (line.startsWith(FIRST_FOUR_PREFIX) && line.matches(FIRST_FOUR_PATTERN)) {
                     String value = contentValues.peek();
-                    value = value.replaceAll("\\.+", ":").trim();
+                    //value = value.replaceAll("\\.+", ":").trim();
                     if (value.endsWith(":")) {
                         value = value.substring(0, value.length() - 1);
                     }
@@ -368,16 +451,44 @@ public class CBPChapterParser {
                     currKey = key;
                 } else if (line.startsWith(FIRST_FOUR_PREFIX) && line.matches(FIRST_EIGHT_PREFIX_PATTERN)) {
                     String value = contentValues.peek();
-                    value = value.replaceAll("\\.+", ":").trim();
-                    if (value.endsWith(":")) {
-                        value = value.substring(0, value.length() - 1);
+                    boolean finish = false;
+                    if (value.contains("....") && ((currType != null && (currType.equals(TEN_KEY) || currType.equals(LAST_TWO_KEY))) ||
+                                    (currType == null && prevType != null && (prevType.equals(TEN_KEY) || prevType.equals(LAST_TWO_KEY))))) {
+                        finish = true;
                     }
+                    //value = value.replaceAll("\\.+", ":").trim();
+                    /*if (value.endsWith(":")) {
+                        value = value.substring(0, value.length() - 1);
+                    }*/
                     if (value.endsWith(": No")) {
                         value = value.substring(0, value.length() - 4);
                     }
-                    System.out.println(prevType + " : " + currType);
+                    if (finish) {
+                        boolean skip = false;
+                        if (lastHTS != null && !lastHTS.equals(htsVal)) {
+                            String[] lastParts = lastHTS.split("\\.");
+                            String[] parts = htsVal.split("\\.");
+                            if (Integer.parseInt(parts[3]) <= Integer.parseInt(lastParts[3])
+                                    && Integer.parseInt(parts[2]) <= Integer.parseInt(lastParts[2])
+                                    && Integer.parseInt(parts[1]) <= Integer.parseInt(lastParts[1])
+                                    && Integer.parseInt(parts[0]) <= Integer.parseInt(lastParts[0])) {
+                                skip = true;
+                            }
+                        }
+                        if (!skip) {
+                            value = value.replaceAll("\\(con.\\)", "");
+                            value = value.replaceAll("\\.{3,}", "->").trim();
+                            value = value.replaceAll(":", "->").trim();
+                            if (value.endsWith("->")) {
+                                value = value.substring(0, value.length()-2);
+                            }
+                            finalHTSMap.put(htsVal, value);
+                            lastHTS = htsVal;
+                        }
+                    }
+                    //System.out.println(prevType + " : " + currType);
 
-                    if (currKey != null && prevType.equals(currType)) {
+                    /*if (currKey != null) {
                         switch (currType) {
                             case "FOUR_KEY": fourLetterMaps.put(currKey, value);
                                             break;
@@ -389,105 +500,31 @@ public class CBPChapterParser {
                             case "TEN_KEY": tenLetterMaps.put(currKey, value);
                                             break;
                         }
-                    }
+                    }*/
 
                 }
-                System.out.println("1");
-                    /*else if (vals.length == 3) {
-                        vals[0] = vals[0].trim();
-                        if (fourLetterMaps.containsValue(vals[0])) {
-                            //if the first 2 wordsets are not in
-                            key = htsVal.substring(0, 10);
-                            if (!eightLetterMaps.containsValue(vals[0] + "->" + vals[1])) {
-                                if (!sixLetterMaps.containsValue(vals[0] + "->" + vals[1])) {
-                                    eightLetterMaps.put(key, vals[0] + "->" + vals[1]);
-                                }
-                            }
-                            if (sixLetterMaps.containsValue(vals[0] + "->" + vals[1])) {
-                                tenLetterMaps.put(htsVal, vals[0] + "->" + vals[1] + "->" + vals[2]);
-                            } else if (eightLetterMaps.containsValue(vals[0] + "->" + vals[1])) {
-                                tenLetterMaps.put(htsVal, vals[0] + "->" + vals[1] + "->" + vals[2]);
-                            }
-                        }
 
-                        key = htsVal.substring(0, 7);
-                        if (!sixLetterMaps.containsValue(vals[0] + "->" + vals[1])) {
-                            if (!eightLetterMaps.containsValue(vals[0] + "->" + vals[1])) {
-                                sixLetterMaps.put(key, vals[0] + "->" + vals[1]);
-                            }
-                        }
-                    } else if (vals.length == 2) {
-                        vals[0] = vals[0].trim();
-                        key = htsVal.substring(0, 10);
-                        if (!fourLetterMaps.containsValue(vals[0]) && !sixLetterMaps.containsValue(vals[0]) && !eightLetterMaps.containsValue(vals[0])) {
-                            eightLetterMaps.put(key, vals[0]);
-                        } else if (sixLetterMaps.containsValue(vals[0])) {
-                            tenLetterMaps.put(htsVal, vals[0] + "->" + vals[1]);
-                        } else if (eightLetterMaps.containsValue(vals[0])) {
-                            tenLetterMaps.put(htsVal, vals[0] + "->" + vals[1]);
-                        } else if (fourLetterMaps.containsValue(vals[0])) {
-                            tenLetterMaps.put(htsVal, vals[0] + "->" + vals[1]);
-                        }
-                    } else if (vals.length > 4) {
-                        /*vals[0] = vals[0].trim();
-                        key = htsVal.substring(0, 4);
-                        if (!fourLetterMaps.containsValue(vals[0])) {
-                            fourLetterMaps.put(key, vals[0]);
-                        }
-                        key = htsVal.substring(0, 7);
-                        vals[1] = vals[0] + "->" + vals[1];
-                        if (!sixLetterMaps.containsValue(vals[1])) {
-                            sixLetterMaps.put(key, vals[1]);
-                        }
-                        key = htsVal.substring(0, 10);
-                        vals[2] = vals[1] + "->" + vals[2];
-                        if (!eightLetterMaps.containsValue(vals[2])) {
-                            eightLetterMaps.put(key, vals[2]);
-                        }
-
-                        String[] subarray = Arrays.asList(vals)
-                                .subList(3, vals.length)
-                                .toArray(new String[0]);
-                        String v = String.join("->", subarray);
-
-                        if (!tenLetterMaps.containsValue(v)) {
-                            tenLetterMaps.put(htsVal, v);
-                        }
-                        System.out.println(htsVal);
-                        //}
-                    }*/
                 prevContentOffset = contentOffset;
-                prevType = currType;
+                if (currType != null ) {
+                    prevType = currType;
+                }
                 prevKey = currKey;
             }
-            System.out.println(finalHTSMap.size());
             Iterator<String> iter = finalHTSMap.keySet().iterator();
+            StringBuilder builder = new StringBuilder();
             while (iter.hasNext()) {
                 String key = iter.next();
-                if (tenLetterMaps.containsKey(key))
-                    continue;
-
-                String[] parts = key.split("\\.");
-                String threeParts =  parts[0] + "." + parts[1] + "." + parts[2];
-                String twoParts = parts[0] + "." + parts[1];
-                String onePart = parts[0];
-                String v = finalHTSMap.get(key);
-                if (eightLetterMaps.containsKey(threeParts)) {
-                    tenLetterMaps.put(key, eightLetterMaps.get(threeParts) + "->" + v);
-                } else if (sixLetterMaps.containsKey(twoParts)) {
-                    tenLetterMaps.put(key, sixLetterMaps.get(twoParts) + "->" + v);
-                } else if (fourLetterMaps.containsKey(onePart)) {
-                    tenLetterMaps.put(key, fourLetterMaps.get(onePart) + "->" + v);
-                }
-                System.out.println(key + " : " + tenLetterMaps.get(key));
+                System.out.println(key + " : " + finalHTSMap.get(key));
+                builder.append("INSERT INTO `fastisf-prod`.hs_codes(COMPLETE_HTS_CODE, DESCRIPTION) VALUES(\"" + key + "\", \"" + finalHTSMap.get(key) + "\");").append(System.lineSeparator());
             }
             System.out.println(finalHTSMap.size());
+            return builder.toString();
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         };
-        //System.out.println(string);
+        return null;
     }
 }
 
